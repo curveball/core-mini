@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import fetch from 'node-fetch';
 import { default as Application, middlewareCall } from '../src/application';
 import MemoryRequest from '../src/memory-request';
 import Context from '../src/context';
@@ -16,10 +15,8 @@ describe('Application', () => {
     application.use((ctx, next) => {
       ctx.response.body = 'hi';
     });
-    const server = application.listen(5555);
-
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
+    const response = await application.subRequest('GET', '/');
+    const body = await response.body;
 
     expect(body).to.equal('hi');
     expect(response.headers.get('server')).to.equal(
@@ -27,7 +24,6 @@ describe('Application', () => {
     );
     expect(response.status).to.equal(200);
 
-    server.close();
   });
 
   it('should work with Buffer responses', async () => {
@@ -35,18 +31,16 @@ describe('Application', () => {
     application.use((ctx, next) => {
       ctx.response.body = Buffer.from('hi');
     });
-    const server = application.listen(5555);
 
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
+    const response = await application.subRequest('GET', '/');
+    const body = await response.body;
 
-    expect(body).to.equal('hi');
+    expect(body).to.equal(Buffer.from('hi'));
     expect(response.headers.get('server')).to.equal(
       'curveball/' + require('../package.json').version
     );
     expect(response.status).to.equal(200);
 
-    server.close();
   });
 
   it('should work with Readable stream responses', async () => {
@@ -54,18 +48,15 @@ describe('Application', () => {
     application.use((ctx, next) => {
       ctx.response.body = fs.createReadStream(__filename);
     });
-    const server = application.listen(5555);
 
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
+    const response = await application.subRequest('GET', '/');
+    const body = await response.body;
 
     expect(body.substring(0, 6)).to.equal('import');
     expect(response.headers.get('server')).to.equal(
       'curveball/' + require('../package.json').version
     );
     expect(response.status).to.equal(200);
-
-    server.close();
   });
 
   it('should automatically JSON-encode objects', async () => {
@@ -73,18 +64,14 @@ describe('Application', () => {
     application.use((ctx, next) => {
       ctx.response.body = { foo: 'bar' };
     });
-    const server = application.listen(5555);
-
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
+    const response = await application.subRequest('GET', '/');
+    const body = await response.body;
 
     expect(body).to.equal('{"foo":"bar"}');
     expect(response.headers.get('server')).to.equal(
       'curveball/' + require('../package.json').version
     );
     expect(response.status).to.equal(200);
-
-    server.close();
   });
 
   it('should handle "null" bodies', async () => {
@@ -92,10 +79,8 @@ describe('Application', () => {
     application.use((ctx, next) => {
       ctx.response.body = null;
     });
-    const server = application.listen(5555);
-
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
+    const response = await application.subRequest('GET', '/');
+    const body = await response.body;
 
     expect(body).to.equal('');
     expect(response.headers.get('server')).to.equal(
@@ -103,7 +88,6 @@ describe('Application', () => {
     );
     expect(response.status).to.equal(200);
 
-    server.close();
   });
 
   it('should throw an exception for unsupported bodies', async () => {
@@ -111,18 +95,14 @@ describe('Application', () => {
     application.use((ctx, next) => {
       ctx.response.body = 5;
     });
-    const server = application.listen(5555);
-
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
+    const response = await application.subRequest('GET', '/');
+    const body = await response.body;
 
     expect(body).to.include(': 500');
     expect(response.headers.get('server')).to.equal(
       'curveball/' + require('../package.json').version
     );
     expect(response.status).to.equal(500);
-
-    server.close();
   });
 
   it('should work with multiple calls to middlewares', async () => {
@@ -134,15 +114,13 @@ describe('Application', () => {
     application.use((ctx, next) => {
       ctx.response.headers.set('X-Foo', 'bar');
     });
-    const server = application.listen(5555);
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
+    const response = await application.subRequest('GET', '/');
+    const body = await response.body;
 
     expect(body).to.equal('hi');
     expect(response.headers.get('X-Foo')).to.equal('bar');
     expect(response.status).to.equal(200);
 
-    server.close();
   });
   it('should work with multiple middlewares as arguments', async () => {
     const application = new Application();
@@ -153,15 +131,10 @@ describe('Application', () => {
       application.use((ctx, next) => {
         ctx.response.headers.set('X-Foo', 'bar');
       });
-    const server = application.listen(5555);
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
-
-    expect(body).to.equal('hi');
+    const response = await application.subRequest('GET', '/');
     expect(response.headers.get('X-Foo')).to.equal('bar');
     expect(response.status).to.equal(200);
 
-    server.close();
   });
 
   it('should work with object-middlewares', async () => {
@@ -175,14 +148,12 @@ describe('Application', () => {
 
     application.use(myMw);
 
-    const server = application.listen(5555);
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
+    const response = await application.subRequest('GET', '/');
+    const body = await response.body;
 
     expect(body).to.equal('hi');
     expect(response.status).to.equal(200);
 
-    server.close();
   });
 
   it('should not call sequential middlewares if next is not called', async () => {
@@ -193,15 +164,14 @@ describe('Application', () => {
     application.use((ctx, next) => {
       ctx.response.headers.set('X-Foo', 'bar');
     });
-    const server = application.listen(5555);
-    const response = await fetch('http://localhost:5555');
-    const body = await response.text();
+
+    const response = await application.subRequest('GET', '/');
+    const body = await response.body;
 
     expect(body).to.equal('hi');
     expect(response.headers.get('X-Foo')).to.equal(null);
     expect(response.status).to.equal(200);
 
-    server.close();
   });
 
   describe('When an uncaught exception happens', () => {
@@ -214,15 +184,12 @@ describe('Application', () => {
       application.on('error', err => {
         error = err;
       });
-      const server = application.listen(5555);
-
-      await fetch('http://localhost:5555');
+      await application.subRequest('GET', '/');
 
       expect(error).to.be.an.instanceof(Error);
       // @ts-ignore: TS complains about error possibly being undefined.
       expect(error.message).to.equal('hi');
 
-      server.close();
     });
 
     it('should return an error message in the response body.', async () => {
@@ -230,24 +197,17 @@ describe('Application', () => {
       application.use((ctx, next) => {
         throw new Error('hi');
       });
-      const server = application.listen(5555);
 
-      const response = await fetch('http://localhost:5555');
-      const body = await response.text();
+      const response = await application.subRequest('GET', '/');
+      const body = await response.body;
       expect(body).to.include(': 500');
-
-      server.close();
     });
   });
 
   describe('When no middlewares are defined', () => {
     it('should do nothing', async () => {
       const application = new Application();
-      const server = application.listen(5555);
-
-      await fetch('http://localhost:5555');
-
-      server.close();
+      await application.subRequest('GET', '/');
     });
   });
 
@@ -304,21 +264,13 @@ describe('Application', () => {
       app.use(ctx => {
         ctx.response.body = 'hi';
       });
-      const server = app.listen(5555);
-
-      const response = await fetch('http://localhost:5555');
+      const response = await app.subRequest('GET', '/');
       expect(response.status).to.equal(200);
-
-      server.close();
     });
     it('should return 404 when no body was set', async () => {
       const app = new Application();
-      const server = app.listen(5555);
-
-      const response = await fetch('http://localhost:5555');
+      const response = await app.subRequest('GET', '/');
       expect(response.status).to.equal(404);
-
-      server.close();
     });
   });
 });
