@@ -2,7 +2,6 @@ import { expect } from 'chai';
 import { default as Application, middlewareCall } from '../src/application';
 import MemoryRequest from '../src/memory-request';
 import Context from '../src/context';
-import fs from 'fs';
 
 describe('Application', () => {
   it('should instantiate', () => {
@@ -35,74 +34,12 @@ describe('Application', () => {
     const response = await application.subRequest('GET', '/');
     const body = await response.body;
 
-    expect(body).to.equal(Buffer.from('hi'));
+    expect(body).to.eql(Buffer.from('hi'));
     expect(response.headers.get('server')).to.equal(
       'curveball/' + require('../package.json').version
     );
     expect(response.status).to.equal(200);
 
-  });
-
-  it('should work with Readable stream responses', async () => {
-    const application = new Application();
-    application.use((ctx, next) => {
-      ctx.response.body = fs.createReadStream(__filename);
-    });
-
-    const response = await application.subRequest('GET', '/');
-    const body = await response.body;
-
-    expect(body.substring(0, 6)).to.equal('import');
-    expect(response.headers.get('server')).to.equal(
-      'curveball/' + require('../package.json').version
-    );
-    expect(response.status).to.equal(200);
-  });
-
-  it('should automatically JSON-encode objects', async () => {
-    const application = new Application();
-    application.use((ctx, next) => {
-      ctx.response.body = { foo: 'bar' };
-    });
-    const response = await application.subRequest('GET', '/');
-    const body = await response.body;
-
-    expect(body).to.equal('{"foo":"bar"}');
-    expect(response.headers.get('server')).to.equal(
-      'curveball/' + require('../package.json').version
-    );
-    expect(response.status).to.equal(200);
-  });
-
-  it('should handle "null" bodies', async () => {
-    const application = new Application();
-    application.use((ctx, next) => {
-      ctx.response.body = null;
-    });
-    const response = await application.subRequest('GET', '/');
-    const body = await response.body;
-
-    expect(body).to.equal('');
-    expect(response.headers.get('server')).to.equal(
-      'curveball/' + require('../package.json').version
-    );
-    expect(response.status).to.equal(200);
-
-  });
-
-  it('should throw an exception for unsupported bodies', async () => {
-    const application = new Application();
-    application.use((ctx, next) => {
-      ctx.response.body = 5;
-    });
-    const response = await application.subRequest('GET', '/');
-    const body = await response.body;
-
-    expect(body).to.include(': 500');
-    expect(response.headers.get('server')).to.equal(
-      'curveball/' + require('../package.json').version
-    );
-    expect(response.status).to.equal(500);
   });
 
   it('should work with multiple calls to middlewares', async () => {
