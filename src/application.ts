@@ -1,20 +1,11 @@
 import { isHttpError } from '@curveball/http-errors';
 import { EventEmitter } from 'events';
-import http from 'http';
 import BaseContext from './base-context';
 import Context from './context';
 import { HeadersInterface, HeadersObject } from './headers';
 import MemoryRequest from './memory-request';
 import MemoryResponse from './memory-response';
 import NotFoundMw from './middleware/not-found';
-import {
-  HttpCallback,
-  NodeHttpRequest,
-  NodeHttpResponse,
-  sendBody
-} from './node/http-utils';
-import NodeRequest from './node/request';
-import NodeResponse from './node/response';
 import Request from './request';
 import Response from './response';
 
@@ -86,52 +77,6 @@ export default class Application extends EventEmitter {
   }
 
   /**
-   * Starts a HTTP server on the specified port.
-   */
-  listen(port: number): http.Server {
-    const server = http.createServer(this.callback());
-    return server.listen(port);
-  }
-
-  /**
-   * This function is a callback that can be used for Node's http.Server,
-   * https.Server, or http2.Server.
-   */
-  callback(): HttpCallback {
-    return async (
-      req: NodeHttpRequest,
-      res: NodeHttpResponse
-    ): Promise<void> => {
-      try {
-        const ctx = this.buildContextFromHttp(req, res);
-        await this.handle(ctx);
-
-        // @ts-ignore - not sure why this line fails
-        sendBody(res, ctx.response.body);
-      } catch (err) {
-        // tslint:disable:no-console
-        console.error(err);
-
-        if (isHttpError(err)) {
-          res.statusCode = err.httpStatus;
-        } else {
-          res.statusCode = 500;
-        }
-        res.setHeader('Content-Type', 'text/plain');
-        res.end(
-          // @ts-ignore
-          'Uncaught exception. No middleware was defined to handle it. We got the following HTTP status: ' +
-          res.statusCode
-        );
-
-        if (this.listenerCount('error')) {
-          this.emit('error', err);
-        }
-      }
-    };
-  }
-
-  /**
    * Does a sub-request based on a Request object, and returns a Response
    * object.
    */
@@ -178,15 +123,4 @@ export default class Application extends EventEmitter {
     return context.response;
   }
 
-  /**
-   * Creates a Context object based on a node.js request and response object.
-   */
-  public buildContextFromHttp(
-    req: NodeHttpRequest,
-    res: NodeHttpResponse
-  ): Context {
-    const context = new BaseContext(new NodeRequest(req), new NodeResponse(res));
-
-    return context;
-  }
 }
